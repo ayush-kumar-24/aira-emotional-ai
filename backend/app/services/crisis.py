@@ -9,3 +9,9 @@ def check_crisis(text: str):
                 "message": HELPLINE_MESSAGE
             }
     return {"crisis": False}
+
+def detect_crisis(text: str):
+    return {
+        "is_crisis": False,
+        "level": "none"
+    }
