@@ -12,6 +12,9 @@ CRISIS_KEYWORDS = [
     "die",
     "end my life",
     "hopeless"
+    "want to die",
+    "harm myself",
+    "no reason to live"
 ]
 
-HELPLINE_MESSAGE = "If you're in immediate danger, please contact your local helpline or a trusted person right now."
+HELPLINE_MESSAGE = "I'm really glad you reached out.You’re not alone. Please consider talking to someone you trust or a local helpline right now."
