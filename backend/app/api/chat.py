@@ -4,6 +4,7 @@ api/chat.py
 Text emotion analysis endpoint
 """
 
+from email.mime import text
 import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -11,6 +12,8 @@ from pydantic import BaseModel
 from app.services.text_emotion import analyze_text_emotion
 from app.services.crisis import check_crisis
 from app.core.constants import EMPATHY_RESPONSES
+from app.services.llm_service import generate_response
+
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +54,9 @@ async def chat(data: ChatInput):
     logger.info(f"Detected emotion: {emotion}")
 
     # Get empathetic response
-    response = EMPATHY_RESPONSES.get(
-        emotion,
-        "I'm here for you. Tell me more."
-    )
+    llm_reply = generate_response(data.text, emotion)
 
     return {
-        "user_text": data.text,
-        "emotion": emotion,
-        "confidence": emotion_result.get("confidence", 0.0),
-        "all_scores": emotion_result.get("all_scores", {}),
-        "response": response
-    }
+    "emotion": emotion,
+    "response": llm_reply
+}
