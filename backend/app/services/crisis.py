@@ -1,16 +1,17 @@
-from app.core.constants import CRISIS_KEYWORDS, HELPLINE_MESSAGE
+from app.core.constants import CRISIS_KEYWORDS
+from app.services.local_responses import generate_crisis_response
 
-def check_crisis(text: str):
+def detect_crisis(text: str):
     text_lower = text.lower()
+
     for word in CRISIS_KEYWORDS:
         if word in text_lower:
             return {
-                "crisis": True,
-                "message": HELPLINE_MESSAGE
+                "is_crisis": True,
+                "level": "high",
+                "message": generate_crisis_response()
             }
-    return {"crisis": False}
 
-def detect_crisis(text: str):
     return {
         "is_crisis": False,
         "level": "none"
