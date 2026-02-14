@@ -1,12 +1,22 @@
 """
 services/voice_emotion.py
 --------------------------
-CORRECTED Voice Emotion Detection with Adaptive Thresholds
+Voice Emotion Detection + Speech-to-Text
 """
 
 import io
 import logging
 import numpy as np
+import tempfile
+import os
+import uuid
+
+# ====== SSL FIX ======
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+os.environ['CURL_CA_BUNDLE'] = ''
+os.environ['REQUESTS_CA_BUNDLE'] = ''
+# ====== SSL FIX END ======
 
 try:
     import librosa
@@ -15,10 +25,51 @@ except ImportError:
     LIBROSA_AVAILABLE = False
     logging.warning("librosa not installed. Voice emotion will return fallback.")
 
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+    print("📥 Loading Whisper model for Speech-to-Text...")
+    whisper_model = whisper.load_model("base")  # Options: tiny, base, small, medium, large
+    print("✅ Whisper model loaded successfully!")
+except ImportError:
+    WHISPER_AVAILABLE = False
+    whisper_model = None
+    logging.warning("⚠️ Whisper not installed. STT will not work. Run: pip install openai-whisper")
+except Exception as e:
+    WHISPER_AVAILABLE = False
+    whisper_model = None
+    logging.error(f"❌ Failed to load Whisper model: {e}")
+
 logger = logging.getLogger(__name__)
 
 TARGET_SR = 22050
 EMOTIONS = ["sad", "calm", "neutral", "happy", "excited", "angry", "fearful"]
+
+def _transcribe_audio(audio_bytes: bytes) -> str:
+    """Convert speech to text using Whisper (using librosa, no FFmpeg needed)"""
+    if not WHISPER_AVAILABLE or whisper_model is None:
+        logger.warning("Whisper not available, returning empty transcription")
+        return ""
+    
+    try:
+        logger.info("🎤 Transcribing audio...")
+        
+        # Load audio from bytes using librosa (no FFmpeg dependency!)
+        audio_file = io.BytesIO(audio_bytes)
+        audio_array, sr = librosa.load(audio_file, sr=16000, mono=True)
+        
+        # Transcribe directly from numpy array
+        result = whisper_model.transcribe(audio_array, language="en", fp16=False)
+        transcription = result["text"].strip()
+        
+        logger.info(f"📝 Transcription: '{transcription}'")
+        return transcription
+        
+    except Exception as e:
+        logger.error(f"Error in transcription: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return ""
 
 
 def _extract_features(audio_bytes: bytes) -> dict:
@@ -279,7 +330,12 @@ def _score_emotions(features: dict) -> dict:
 
 
 def analyze_voice(audio_bytes: bytes) -> dict:
-    """Main function to analyze voice emotion"""
+    """Main function to analyze voice emotion + transcribe speech"""
+    
+    # 1. Speech-to-Text
+    transcription = _transcribe_audio(audio_bytes)
+    
+    # 2. Emotion Detection
     features = _extract_features(audio_bytes)
     all_scores = _score_emotions(features)
 
@@ -291,6 +347,7 @@ def analyze_voice(audio_bytes: bytes) -> dict:
     )
 
     return {
+        "transcription": transcription,  # ⭐ NEW: Speech-to-text
         "emotion": emotion,
         "confidence": round(confidence, 4),
         "features": {k: round(v, 6) for k, v in features.items()},

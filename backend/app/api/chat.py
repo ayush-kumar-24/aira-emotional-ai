@@ -1,7 +1,7 @@
 """
 api/chat.py
 -----------
-Text emotion analysis endpoint
+Text-to-Text conversation (NO voice)
 """
 
 import logging
@@ -11,45 +11,55 @@ from pydantic import BaseModel
 from app.services.text_emotion import analyze_text_emotion
 from app.services.crisis import detect_crisis
 from app.services.llm_service import generate_response
+from app.services.memory import add_emotion, get_emotion_history
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/chat", tags=["Text Emotion Analysis"])
+router = APIRouter(prefix="/api/chat", tags=["Text Chat"])
 
 
 class ChatInput(BaseModel):
     text: str
 
 
-@router.post(
-    "",
-    summary="Analyze emotion from text",
-    response_description="Emotion analysis with empathetic response"
-)
+@router.post("", summary="Text-to-Text conversation")
 async def chat(data: ChatInput):
+    """
+    Text Chat Mode
+    
+    User sends text → AI replies with text only
+    No audio generation in this mode
+    """
+    
+    logger.info(f"📝 Text mode - Received: {data.text[:50]}...")
 
-    logger.info(f"Received text: {data.text[:50]}...")
-
-    # 🚨 Crisis Check First
+    # 🚨 Crisis Check
     crisis_data = detect_crisis(data.text)
-
     if crisis_data["is_crisis"]:
-        logger.warning("Crisis detected.")
         return {
             "emotion": "crisis",
-            "response": crisis_data["message"]
+            "response_text": crisis_data["message"]
         }
 
-    # 🧠 Emotion Analysis
+    # 🧠 Emotion Detection
     emotion_result = analyze_text_emotion(data.text)
     emotion = emotion_result["emotion"]
 
-    logger.info(f"Detected emotion: {emotion}")
+    add_emotion("demo_user", emotion)
+    emotion_history = get_emotion_history("demo_user")
 
     # 🤖 LLM Response
-    llm_reply = generate_response(data.text, emotion)
+    assistant_reply = generate_response(
+        data.text,
+        emotion,
+        emotion_history,
+        user_id="demo_user"
+    )
+
+    logger.info(f"✅ Text response generated")
 
     return {
         "emotion": emotion,
-        "response": llm_reply
+        "response_text": assistant_reply
+        # NO audio in text mode!
     }
