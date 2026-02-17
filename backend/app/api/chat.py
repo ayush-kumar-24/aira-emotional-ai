@@ -8,6 +8,9 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.db.database import SessionLocal
+from app.db.models import Conversation
+
 from app.services.text_emotion import analyze_text_emotion
 from app.services.crisis import detect_crisis
 from app.services.llm_service import generate_response
@@ -22,15 +25,10 @@ class ChatInput(BaseModel):
     text: str
 
 
+# ✅ CHAT ENDPOINT
 @router.post("", summary="Text-to-Text conversation")
 async def chat(data: ChatInput):
-    """
-    Text Chat Mode
-    
-    User sends text → AI replies with text only
-    No audio generation in this mode
-    """
-    
+
     logger.info(f"📝 Text mode - Received: {data.text[:50]}...")
 
     # 🚨 Crisis Check
@@ -56,10 +54,29 @@ async def chat(data: ChatInput):
         user_id="demo_user"
     )
 
-    logger.info(f"✅ Text response generated")
+    # 💾 SAVE TO SQLITE
+    db = SessionLocal()
+    conversation = Conversation(
+        user_message=data.text,
+        assistant_message=assistant_reply,
+        emotion=emotion
+    )
+    db.add(conversation)
+    db.commit()
+    db.close()
+
+    logger.info("✅ Text response generated & saved to DB")
 
     return {
         "emotion": emotion,
         "response_text": assistant_reply
-        # NO audio in text mode!
     }
+
+
+# ✅ HISTORY ENDPOINT (Outside chat function)
+@router.get("/history", summary="Get all chat history")
+def get_history():
+    db = SessionLocal()
+    conversations = db.query(Conversation).all()
+    db.close()
+    return conversations

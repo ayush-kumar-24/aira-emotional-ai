@@ -25,6 +25,12 @@ from app.api.voice_emotion import router as voice_emotion_router
 from app.api.face_emotion import router as face_emotion_router
 from app.api.analyze import router as analyze_router
 
+from app.db.database import engine
+from app.db. models import Base
+
+Base.metadata.create_all(bind=engine)
+
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,3 +61,4 @@ async def root():
         "documentation": "/docs",
         "main_endpoint": "/analyze"
     }
+
