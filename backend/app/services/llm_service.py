@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 from app.services.memory import add_message, get_conversation
 from app.core.tone_manager import get_tone_config
 
-
-
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -38,20 +36,20 @@ If user expresses serious self-harm intent:
 - Suggest professional help gently
 
 You are emotional support, not a doctor.
-You are AIRA, an emotional AI assistant.
 
-You are aware that the app includes the following built-in wellness tools:
-- Breathing Mode (guided breathing exercises)
-- Hydration Mode (reminders to drink water)
-- Grounding Techniques (5-4-3-2-1 method etc.)
+You are aware that the app has the following features:
+- Breathing Mode (guided breathing for anxiety and stress)
+- Hydration Mode (reminds user to drink water)
+- Grounding Techniques (5-4-3-2-1 calming exercises)
 - Diary Mode (private journaling space)
 
 IMPORTANT:
-- Do NOT always suggest these.
-- Only suggest them when emotionally appropriate.
-- Suggest gently, not forcefully.
-- Never mention "frontend" or "feature" technically.
-- Suggest naturally like a caring assistant."""
+- Do NOT suggest these features every time.
+- Only suggest them when they are clearly helpful.
+- Suggest them naturally inside conversation.
+- Do not sound robotic or like a menu.
+- Make suggestions feel caring and intuitive.
+"""
 
 
 def generate_response(
@@ -61,30 +59,72 @@ def generate_response(
     user_id: str = "default"
 ):
 
-    # Get tone configuration
+    # Optional tone config (if used elsewhere)
     tone_config = get_tone_config(detected_emotion)
 
-    # Add user message to memory
+    # Save user message into memory
     add_message(user_id, "user", user_text)
 
     conversation_history = get_conversation(user_id)
 
+    # -------------------------------
+    # 🔥 Smart Feature Suggestion Layer
+    # -------------------------------
+
+    feature_hint = ""
+    text_lower = user_text.lower()
+
+    if any(word in text_lower for word in [
+        "chest", "tight", "panic", "anxious", "anxiety",
+        "overwhelmed", "can't breathe", "cant breathe"
+    ]):
+        feature_hint = "Breathing Mode may be helpful."
+
+    elif any(word in text_lower for word in [
+        "water", "dehydrated", "thirsty", "haven’t had water",
+        "havent had water", "no water today"
+    ]):
+        feature_hint = "Hydration Mode may be helpful."
+
+    elif any(word in text_lower for word in [
+        "overthinking", "racing thoughts", "can't focus",
+        "cant focus", "distracted", "mind is running"
+    ]):
+        feature_hint = "Grounding Techniques may be helpful."
+
+    elif any(word in text_lower for word in [
+        "write", "journal", "track my day", "diary",
+        "start writing", "reflect"
+    ]):
+        feature_hint = "Diary Mode may be helpful."
+
+    # -------------------------------
+    # 🧠 Build LLM Messages
+    # -------------------------------
+
     messages = [
         {
-    "role": "system",
-    "content": f"""
+            "role": "system",
+            "content": f"""
 {SYSTEM_PROMPT}
 
 Current detected emotion: {detected_emotion}
 Emotion history: {emotion_history}
 
-If repeated negative emotions appear, gently acknowledge the pattern.
+Potential helpful feature right now: {feature_hint}
+
+If a feature seems helpful, suggest it gently and naturally.
+If not necessary, continue normal emotional support.
 """
-}
+        }
     ]
 
-    # Add past conversation
+    # Add past conversation memory
     messages.extend(conversation_history)
+
+    # -------------------------------
+    # 🤖 Call Groq LLM
+    # -------------------------------
 
     completion = client.chat.completions.create(
         model="llama-3.1-8b-instant",
